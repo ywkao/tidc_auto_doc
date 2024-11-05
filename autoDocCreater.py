@@ -52,25 +52,30 @@ class QualityControlDocGenerator:
     #----------------------------------------------------------------------------------------------------
     def create_directories(self):
         """ Create folders based on CERN ID """
+        print("[INFO] 建立資料夾：")
         for index, row in self.df.iterrows():
             sub_folder = os.path.join(self.base, row['CERN ID'])
             os.makedirs(sub_folder, exist_ok=True)
+            print(f"A folder has been created: {sub_folder}")
+        print("")
 
     def create_documents(self):
-        generator._convert_data()
-        for i, element in enumerate(all_info_lists):
-            generator._update_data(*element)
-            generator._create_quality_control_doc()
+        """ Create documents """
+        self._convert_data()
+
+        print("[INFO] 建立docx文件：")
+        for i, element in enumerate(self.all_info_lists):
+            self._update_data(*element)
+            self._create_quality_control_doc()
 
     #----------------------------------------------------------------------------------------------------
     # auxiliary modules
     #----------------------------------------------------------------------------------------------------
     def _convert_data(self):
         # Find the Glue column
-        glue_column = self._find_column_by_keyword('Glue')
-        if glue_column: print(f"Found Glue column: {glue_column}")
-        else: print("Warning: Glue column not found!")
-    
+        self.glue_column = self._find_column_by_keyword('Glue')
+        if not self.glue_column: print("[Warning] Glue column not found!")
+
         # Create inspection items for the first row
         self.all_info_lists = []
         for index, row in self.df.iterrows():
@@ -84,8 +89,8 @@ class QualityControlDocGenerator:
         self.folder = os.path.join(self.base, self.cernID)
         self.output_file = os.path.join(self.folder, f'{gdoc}')
         self.image_path = os.path.join(self.base, '20240913_104336.jpg')
-        print(f"{self.image_path}")
-        print(f"{self.output_file}")
+        # print(f"{self.image_path}")
+        # print(f"{self.output_file}")
 
     def _create_quality_control_doc(self):
         self.doc = docx.Document()
@@ -108,19 +113,20 @@ class QualityControlDocGenerator:
         if not os.path.exists(self.base):
             os.makedirs(self.base)
             print(f'新增 {self.base}')
-        
+
         # List all files in the directory
         files = os.listdir(self.base)
         for f in files:
             full_path = os.path.join(self.base, f)
             file_size = os.path.getsize(full_path)
             print(f"- {f} ({file_size} bytes)")
-        
+
         # Check for specific file
         if os.path.exists(self.csv):
             print(f"\nFound target file: {self.filename}")
             print(f"Full path: {self.csv}")
             print(f"File size: {os.path.getsize(self.csv)} bytes")
+            print("")
 
     def _read_and_process_csv(self):
         """
@@ -129,39 +135,38 @@ class QualityControlDocGenerator:
         try:
             # Skip the first two rows and use the third row as headers
             df = pd.read_csv(self.csv, skiprows=2, header=0)
-    
-            # Clean up column names (remove newlines and extra spaces)
             df.columns = [str(col).strip().replace('\n', ' ') for col in df.columns]
-    
-            # Print the column names to verify
-            print("\nColumn names:")
-            for i, col in enumerate(df.columns):
-                print(f"{i}: '{col}'")
-    
-            keywords = ['CERN ID', 'Accept?', 'Filename', 'Photo']
-            # Print the first few rows of data
-            print("\nFirst few rows of data (selected columns):")
-            print(df[keywords].head())
-    
+            # self._inspect_contents(df)
             return df
-    
+
         except Exception as e:
             print(f"Error processing file: {str(e)}")
             return None
-    
+
+    def _inspect_contents(self, df):
+        # Print the column names to verify
+        print("\nColumn names:")
+        for i, col in enumerate(df.columns):
+            print(f"{i}: '{col}'")
+
+        # Print the first few rows of data
+        keywords = ['CERN ID', 'Accept?', 'Filename', 'Photo']
+        print("\nFirst few rows of data (selected columns):")
+        print(df[keywords].head())
+
     def _find_column_by_keyword(self, keyword):
         """
         Find column name that contains the given keyword
         """
         matching_cols = [col for col in self.df.columns if keyword.lower() in col.lower()]
         return matching_cols[0] if matching_cols else None
-    
+
     def _create_inspection_items(self, row):
         """
         Create inspection items list based on DataFrame content for a specific row
         # row = df.iloc[row_index]
         """
-    
+
         # Create lists with matching from DataFrame
         info = [
             ("User:", str(row['User']) if pd.notna(row['User']) else ""),
@@ -171,7 +176,7 @@ class QualityControlDocGenerator:
             ("Batch:", str(row['Batch']) if pd.notna(row['Batch']) else ""),
             ("ID:", str(row['CERN ID']) if pd.notna(row['CERN ID']) else "")
         ]
-    
+
         inspection_items = [
             ("General comments:", "", 2, [34, 0, 42]),
             ("Flatness:", f"{row['Flatness']}mm", 1, [2, 2]),
@@ -180,17 +185,17 @@ class QualityControlDocGenerator:
             ("Plating (BGA):", "PASS" if row['Plating (BGA)'] else "FAIL", 1, [4, 8]),
             ("Plating (Holes):", "PASS" if row['Plating (Holes)'] else "FAIL", 0, [4, 8]),
             ("Soldermask alignment:", "PASS" if row['Soldermask alignment'] else "FAIL", 1, [4, 26]),
-            ("Glue problems?", "PASS" if row[glue_column] else "FAIL", 1, [7, 26]) if glue_column else
+            ("Glue problems?", "PASS" if row[self.glue_column] else "FAIL", 1, [7, 26]) if self.glue_column else
             ("Glue problems?", "UNKNOWN", 1, [7, 26]),
             ("Test coupons (observations, continuity measurements etc.):",
              "PASS" if row['Test coupons (observations, continuity measurements etc.)'] else "FAIL", 2, [4, 10, 42]),
             ("Accept?", "PASS" if row['Accept?'] else "FAIL", 1, [4, 12])
         ]
-    
+
         gdoc = row['Filename'] + '.docx'
-    
+
         return info, inspection_items, gdoc
-    
+
     #----------------------------------------------------------------------------------------------------
     # Document-related
     #----------------------------------------------------------------------------------------------------
@@ -267,7 +272,7 @@ class QualityControlDocGenerator:
                 paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 run = paragraph.add_run()
                 run.add_picture(self.image_path, width=Inches(6))
-                print(f'[INFO] add picture: {self.image_path}')
+                # print(f'[INFO] add picture: {self.image_path}')
 
             if nLines > 0:
                 p = self.doc.add_paragraph()

@@ -1,5 +1,9 @@
 from autoDocCreater import QualityControlDocGenerator
 
-tester = QualityControlDocGenerator('autoDoc', 'test.csv', './')
+folder = 'autoDoc'
+csv = 'test.csv'
 
-print(tester.create_directories())
+tester = QualityControlDocGenerator(folder, csv, './')
+
+tester.create_directories()
+tester.create_documents()

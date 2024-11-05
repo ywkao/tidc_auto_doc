@@ -79,7 +79,7 @@ class QualityControlDocGenerator:
 
         # Check for specific file
         if os.path.exists(self.csv):
-            print(f"\n[INFO] Found target file: {self.filename}")
+            print(f"[INFO] Found target file: {self.filename}")
             print(f"Full path: {self.csv}")
             print(f"File size: {os.path.getsize(self.csv)} bytes")
             print("")
@@ -94,6 +94,7 @@ class QualityControlDocGenerator:
             # Skip the first two rows and use the third row as headers
             df = pd.read_csv(self.csv, skiprows=2, header=0) # 刪除前兩行
             df = df.dropna(subset=['User'])  # 刪除 User 欄位為空的列
+            df = df.fillna('') # replace all NaN with empty strings
             df.columns = [str(col).strip().replace('\n', ' ') for col in df.columns]
             # self._inspect_contents(df)
             return df
@@ -136,6 +137,11 @@ class QualityControlDocGenerator:
         underlined_spaces.font.color.rgb = color or self.black
         underlined_spaces.font.underline = WD_UNDERLINE.THICK
 
+    def _add_empty_spaces(self, paragraph, Nspaces=4, color=None):
+        space = ' '
+        underlined_spaces = paragraph.add_run(space * Nspaces)
+        underlined_spaces.font.color.rgb = color or self.black
+
     def _add_title(self, row):
         title = self.doc.add_paragraph("Hexaboard 8\"V3 HD-FUll-HB-V2.2 Quality control traveler document V3")
         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -174,9 +180,11 @@ class QualityControlDocGenerator:
         for i, cell in enumerate(new_table.rows[0].cells):
             cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
             if i==0:
+                # cell.width = Inches(2)
                 paragraph = cell.add_paragraph()
                 paragraph.add_run(f"{row['p2_Chip ID']}")
             elif i==1:
+                # cell.width = Inches(4)
                 self._add_image_to_cell(cell, row.get('p2_Chip location map link', ''))
 
     def _add_image_to_cell(self, cell, image_link, default_width=3):
@@ -208,7 +216,7 @@ class QualityControlDocGenerator:
                 return False
 
             run = paragraph.add_run()
-            run.add_picture(image_path, width=Inches(default_width))
+            run.add_picture(image_path, height=Inches(default_width))
             return True
 
         except Exception as e:
@@ -220,12 +228,15 @@ class QualityControlDocGenerator:
             return False
 
     def _add_customized_paragraph(self, paragraph, item, value, spaces):
+        useEmptySpace = (spaces[0]==0) and (spaces[1]==0)
+
         paragraph.add_run(f"{item} ")
         self._add_underlined_spaces(paragraph, spaces[0])
         run = paragraph.add_run(value)
-        run.font.underline = WD_UNDERLINE.THICK
+        if useEmptySpace is False: run.font.underline = WD_UNDERLINE.THICK
         run.font.color.rgb = self.blue
         self._add_underlined_spaces(paragraph, spaces[1])
+        if useEmptySpace: self._add_empty_spaces(paragraph)
 
     def _add_first_visual_inspection(self, row):
         self.doc.add_heading("1st Visual Inspection – Bare PCB", level=1)
@@ -249,7 +260,7 @@ class QualityControlDocGenerator:
                 paragraph = self.doc.add_paragraph()
                 paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 run = paragraph.add_run()
-                run.add_picture(image_path, width=Inches(6))
+                run.add_picture(image_path, height=Inches(3))
                 # print(f'[INFO] add picture: {image_path}')
 
             if nLines > 0: p = self.doc.add_paragraph()

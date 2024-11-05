@@ -25,8 +25,8 @@ class QualityControlDocGenerator:
         self.df = self._read_and_process_csv()
 
         # Find the Glue column
-        self.glue_column = self._find_column_by_keyword('Glue')
-        if not self.glue_column: print("[Warning] Glue column not found!")
+        # self.glue_column = self._find_column_by_keyword('Glue')
+        # if not self.glue_column: print("[Warning] Glue column not found!")
 
     #----------------------------------------------------------------------------------------------------
     # main methods

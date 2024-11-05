@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import docx
 from docx.shared import Pt, RGBColor, Inches
+from docx.enum.table import WD_ALIGN_VERTICAL, WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_UNDERLINE
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -14,15 +15,6 @@ class QualityControlDocGenerator:
         self.doc = None
         self.black = RGBColor(0, 0, 0)
         self.blue = RGBColor(0, 0, 255)
-
-        self.assembled_items = [
-            ("General comments:", "", 1, [34, 0]),
-            ("Flatness:", "", 1, [38, 0]),
-            ("HGCROC type:", "", 1, [14, 0]),
-            ("HGCROC rotation:", "", 0, [14, 0]),
-            ("Connectors:", "", 1, [15, 0]),
-            ("Resistors/capacitors:", "", 0, [12, 0])
-        ]
 
         # Check & Read the CSV
         self._check_folder()
@@ -58,7 +50,6 @@ class QualityControlDocGenerator:
         self.folder = os.path.join(self.base, self.cernID)
         self.gdoc = row['filename+ID'] + '.docx'
         self.output_file = os.path.join(self.folder, self.gdoc)
-        self.image_path = os.path.join(self.base, row['image link'])
 
         self.doc = docx.Document()
         self._set_page_margins()
@@ -73,9 +64,7 @@ class QualityControlDocGenerator:
     #----------------------------------------------------------------------------------------------------
     # Load-data related
     #----------------------------------------------------------------------------------------------------
-    def _check_folder(self):
-        """ To-do: return error if folder/csv does not exist """
-
+    def _check_folder(self): # TODO: return error if folder/csv does not exist
         # 確保目標資料夾存在
         if not os.path.exists(self.base):
             os.makedirs(self.base)
@@ -86,14 +75,16 @@ class QualityControlDocGenerator:
         for f in files:
             full_path = os.path.join(self.base, f)
             file_size = os.path.getsize(full_path)
-            print(f"- {f} ({file_size} bytes)")
+            # print(f"- {f} ({file_size} bytes)")
 
         # Check for specific file
         if os.path.exists(self.csv):
-            print(f"\nFound target file: {self.filename}")
+            print(f"\n[INFO] Found target file: {self.filename}")
             print(f"Full path: {self.csv}")
             print(f"File size: {os.path.getsize(self.csv)} bytes")
             print("")
+        else:
+            print(f"\n[ERROR] Target file does not exist: {self.filename}")
 
     def _read_and_process_csv(self):
         """
@@ -174,73 +165,95 @@ class QualityControlDocGenerator:
             run.font.color.rgb = self.blue
             self._add_underlined_spaces(p, 4 - (i // 5))
 
-    def _add_formatted_table(self):
-        # 添加一個空行作為間隔
-        self.doc.add_paragraph()
-
+    def _add_formatted_table(self, row):
         # 添加新的1x2表格
         new_table = self.doc.add_table(rows=1, cols=2)
         new_table.style = 'Normal Table'
 
-        for cell in new_table.rows[0].cells:
-            # 添加5個空行到每個單元格
-            for _ in range(5):
-                cell.add_paragraph()
+        # Add chip ID & chip map
+        for i, cell in enumerate(new_table.rows[0].cells):
+            cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+            if i==0:
+                paragraph = cell.add_paragraph()
+                paragraph.add_run(f"{row['p2_Chip ID']}")
+            elif i==1:
+                self._add_image_to_cell(cell, row.get('p2_Chip location map link', ''))
 
-            # skip customized format
-            continue
+    def _add_image_to_cell(self, cell, image_link, default_width=3):
+        """
+        Adds an image to a table cell with error handling.
 
-            # 設置單元格邊框為黑色
-            tc = cell._tc
-            tcPr = tc.get_or_add_tcPr()
+        Args:
+            cell: The table cell to add the image to
+            image_link: The path to the image
+            default_width: Width in inches for the image (default: 3)
 
-            # 設置邊框
-            for border_pos in ['top', 'left', 'bottom', 'right']:
-                border = OxmlElement('w:tcBorders')
-                border_element = OxmlElement(f'w:{border_pos}')
-                border_element.set(qn('w:val'), 'single')
-                border_element.set(qn('w:sz'), '4')
-                border_element.set(qn('w:space'), '0')
-                border_element.set(qn('w:color'), '#000000')
-                border.append(border_element)
-                tcPr.append(border)
+        Returns:
+            bool: True if image was added successfully, False otherwise
+        """
+        paragraph = cell.add_paragraph()
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        if not image_link or not image_link.strip():
+            run = paragraph.add_run("No image available")
+            run.italic = True
+            return False
+
+        try:
+            image_path = os.path.join(self.base, image_link)
+            if not os.path.exists(image_path):
+                run = paragraph.add_run("Image file not found")
+                run.italic = True
+                run.font.color.rgb = RGBColor(255, 0, 0)
+                return False
+
+            run = paragraph.add_run()
+            run.add_picture(image_path, width=Inches(default_width))
+            return True
+
+        except Exception as e:
+            # Log the error if needed
+            print(f"Error adding image: {str(e)}")
+            run = paragraph.add_run("Error loading image")
+            run.italic = True
+            run.font.color.rgb = RGBColor(255, 0, 0)
+            return False
+
+    def _add_customized_paragraph(self, paragraph, item, value, spaces):
+        paragraph.add_run(f"{item} ")
+        self._add_underlined_spaces(paragraph, spaces[0])
+        run = paragraph.add_run(value)
+        run.font.underline = WD_UNDERLINE.THICK
+        run.font.color.rgb = self.blue
+        self._add_underlined_spaces(paragraph, spaces[1])
 
     def _add_first_visual_inspection(self, row):
         self.doc.add_heading("1st Visual Inspection – Bare PCB", level=1)
 
         inspection_items = [
-            ("General comments:", "", 2, [34, 0, 42]),
-            ("Flatness:", f"{row['Flatness']}mm", 1, [2, 2]),
-            ("Comments:", "", 0, [25, 0]),
-            ("Thickness measurements:", f"{row['Thickness measurements']}mm", 1, [4, 22]),
-            ("Plating (BGA):", "PASS" if row['Plating (BGA)'] else "FAIL", 1, [4, 8]),
-            ("Plating (Holes):", "PASS" if row['Plating (Holes)'] else "FAIL", 0, [4, 8]),
-            ("Soldermask alignment:", "PASS" if row['Soldermask alignment'] else "FAIL", 1, [4, 26]),
-            ("Glue problems?", "PASS" if row[self.glue_column] else "FAIL", 1, [7, 26]) if self.glue_column else
-            ("Glue problems?", "UNKNOWN", 1, [7, 26]),
-            ("Test coupons (observations, continuity measurements etc.):",
-             "PASS" if row['Test coupons (observations, continuity measurements etc.)'] else "FAIL", 2, [4, 10, 42]),
-            ("Accept?", "PASS" if row['Accept?'] else "FAIL", 1, [4, 12])
+            ("General comments:"       , f"{row['General comments']}"         , 2 , [34, 0, 42]),
+            ("Flatness:"               , f"{row['Flatness']}"                 , 1 , [2  , 2])  ,
+            ("Comments:"               , f"{row['Comments']}"                 , 0 , [25 , 0])  ,
+            ("Thickness measurements:" , f"{row['Thickness measurements']}mm" , 1 , [4  , 22]) ,
+            ("Plating (BGA):"          , f"{row['Plating (BGA)']}"            , 1 , [4  , 8])  ,
+            ("Plating (Holes):"        , f"{row['Plating (Holes)']}"          , 0 , [4  , 8])  ,
+            ("Soldermask alignment:"   , f"{row['Soldermask alignment']}"     , 1 , [4  , 26]) ,
+            ("Glue problems?"          , f"{row['Glue problems?']}"           , 1 , [7  , 26]) ,
+            ("Test coupons (observations, continuity measurements etc.):", f"{row['Test coupons (observations, continuity measurements etc.)']}" , 2, [4, 10, 42]),
+            ("Accept?"                 , f"{row['Accept?']}"                  , 1 , [4  , 12]),
         ]
 
         for item, value, nLines, spaces in inspection_items:
             if 'Accept' in item:
+                image_path = os.path.join(self.base, row['image link'])
                 paragraph = self.doc.add_paragraph()
                 paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 run = paragraph.add_run()
-                run.add_picture(self.image_path, width=Inches(6))
-                # print(f'[INFO] add picture: {self.image_path}')
+                run.add_picture(image_path, width=Inches(6))
+                # print(f'[INFO] add picture: {image_path}')
 
-            if nLines > 0:
-                p = self.doc.add_paragraph()
-
-            p.add_run(f"{item} ")
-            self._add_underlined_spaces(p, spaces[0])
-
-            run = p.add_run(value)
-            run.font.underline = WD_UNDERLINE.THICK
-            run.font.color.rgb = self.blue
-            self._add_underlined_spaces(p, spaces[1])
+            if nLines > 0: p = self.doc.add_paragraph()
+            self._add_customized_paragraph(p, item, value, spaces)
 
             if nLines == 2:
                 p = self.doc.add_paragraph()
@@ -249,30 +262,36 @@ class QualityControlDocGenerator:
     def _add_second_visual_inspection(self, row):
         self.doc.add_heading("2nd Visual Inspection – Assembled PCB", level=1)
 
-        for item, value, nLines, spaces in self.assembled_items:
-            if nLines > 0:
-                p = self.doc.add_paragraph()
-            p.add_run(f"{item} ")
-            self._add_underlined_spaces(p, spaces[0])
-            p.add_run(value)
-            self._add_underlined_spaces(p, spaces[1])
-
-        self._add_formatted_table()
-
-        self.doc.add_heading("Functional Tests", level=1)
-
-        functional_tests = [
-            ("Power-on current:", "_______________"+' '*8),
-            ("Configured OK:", "Yes/No"+' '*8),
-            ("Operating current:", "________________"),
-            ("DAQ lines OK:", ""),
+        # Assembling data
+        assembled_items = [
+            ("General comments:"    , f"{row['p2_General comments']}"    , 1, [4, 29]),
+            ("Flatness:"            , f"{row['p2_Flatness']}"            , 1, [4, 30]),
+            ("HGCROC type:"         , f"{row['p2_HGCROC type']}"         , 1, [4,  8]),
+            ("HGCROC rotation:"     , f"{row['p2_HGCROC rotation']}"     , 0, [4,  8]),
+            ("Connectors:"          , f"{row['p2_Connectors']}"          , 1, [4,  8]),
+            ("Resistors/capacitors:", f"{row['p2_Resistors/capacitors']}", 0, [4,  8]),
         ]
 
-        for i, (item, value) in enumerate(functional_tests):
-            if i%3==0:
-              p = self.doc.add_paragraph()
-            p.add_run(f"{item} ")
-            p.add_run(value)
+        for item, value, nLines, spaces in assembled_items:
+            if nLines > 0: p = self.doc.add_paragraph()
+            self._add_customized_paragraph(p, item, value, spaces)
+
+        # Table for chip ID and location map
+        self.doc.add_paragraph()
+        self._add_formatted_table(row)
+
+        # Functional tests
+        self.doc.add_heading("Functional Tests", level=1)
+        functional_tests = [
+            ("Power-on current:" , f"{row['p2_Power-on current']}" , 1, [4, 10]),
+            ("Configured OK:"    , f"{row['p2_Configured OK']}"    , 0, [0,  0]),
+            ("Operating current:", f"{row['p2_Operating current']}", 0, [4, 10]),
+            ("DAQ lines OK: "    , f"{row['p2_DAQ lines OK']}"     , 1, [0,  0]),
+        ]
+
+        for item, value, nLines, spaces in functional_tests:
+            if nLines > 0: p = self.doc.add_paragraph()
+            self._add_customized_paragraph(p, item, value, spaces)
 
 # Usage example
 if __name__ == "__main__":

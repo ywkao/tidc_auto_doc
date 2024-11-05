@@ -14,26 +14,7 @@ class QualityControlDocGenerator:
         self.doc = None
         self.black = RGBColor(0, 0, 0)
         self.blue = RGBColor(0, 0, 255)
-        self.info = [
-            ("User:", "TIDC"),
-            ("Date:", "2024/09/13"),
-            ("Version:", "V3-HD-Full-HB-v2.2"),
-            ("Manufacturer:", "Plotech"),
-            ("Batch:", "2432"),
-            ("ID:", "320-07-01-003-00000")
-        ]
-        self.inspection_items = [
-            ("General comments:", "", 2, [34, 0, 42]),
-            ("Flatness:", "<0.5mm", 1, [2, 2]),
-            ("Comments:", "", 0, [25, 0]),
-            ("Thickness measurements:", "1.311mm", 1, [4, 22]),
-            ("Plating (BGA):", "PASS", 1, [4, 8]),
-            ("Plating (Holes):", "PASS", 0, [4, 8]),
-            ("Soldermask alignment:", "PASS", 1, [4, 26]),
-            ("Glue problems?", "PASS", 1, [7, 26]),
-            ("Test coupons (observations, continuity measurements etc.):", "PASS", 2, [4, 10, 42]),
-            ("Accept?", "PASS", 1, [4, 12])
-        ]
+
         self.assembled_items = [
             ("General comments:", "", 1, [34, 0]),
             ("Flatness:", "", 1, [38, 0]),
@@ -46,6 +27,10 @@ class QualityControlDocGenerator:
         # Check & Read the CSV
         self._check_folder()
         self.df = self._read_and_process_csv()
+
+        # Find the Glue column
+        self.glue_column = self._find_column_by_keyword('Glue')
+        if not self.glue_column: print("[Warning] Glue column not found!")
 
     #----------------------------------------------------------------------------------------------------
     # main methods
@@ -61,45 +46,27 @@ class QualityControlDocGenerator:
 
     def create_documents(self):
         """ Create documents """
-        self._convert_data()
-
         print("[INFO] 建立docx文件：")
-        for i, element in enumerate(self.all_info_lists):
-            self._update_data(*element)
-            self._create_quality_control_doc()
+        for index, row in self.df.iterrows():
+            self._create_quality_control_doc(row)
 
     #----------------------------------------------------------------------------------------------------
     # auxiliary modules
     #----------------------------------------------------------------------------------------------------
-    def _convert_data(self):
-        # Find the Glue column
-        self.glue_column = self._find_column_by_keyword('Glue')
-        if not self.glue_column: print("[Warning] Glue column not found!")
-
-        # Create inspection items for the first row
-        self.all_info_lists = []
-        for index, row in self.df.iterrows():
-            info, items, gdoc = self._create_inspection_items(row)
-            self.all_info_lists.append((info, items, gdoc))
-
-    def _update_data(self, info, items, gdoc):
-        self.info = info
-        self.inspection_items = items
-        self.cernID = info[5][1]
+    def _create_quality_control_doc(self, row):
+        self.cernID = row['ID']
         self.folder = os.path.join(self.base, self.cernID)
-        self.output_file = os.path.join(self.folder, f'{gdoc}')
-        self.image_path = os.path.join(self.base, '20240913_104336.jpg')
-        # print(f"{self.image_path}")
-        # print(f"{self.output_file}")
+        self.gdoc = row['filename+ID'] + '.docx'
+        self.output_file = os.path.join(self.folder, self.gdoc)
+        self.image_path = os.path.join(self.base, row['image link'])
 
-    def _create_quality_control_doc(self):
         self.doc = docx.Document()
         self._set_page_margins()
-        self._add_title()
-        self._add_first_visual_inspection()
+        self._add_title(row)
+        self._add_first_visual_inspection(row)
         self.doc.add_page_break()
-        self._add_title()
-        self._add_second_visual_inspection()
+        self._add_title(row)
+        self._add_second_visual_inspection(row)
         self.doc.save(self.output_file)
         print(f"Document has been saved as {self.output_file}")
 
@@ -162,41 +129,6 @@ class QualityControlDocGenerator:
         matching_cols = [col for col in self.df.columns if keyword.lower() in col.lower()]
         return matching_cols[0] if matching_cols else None
 
-    def _create_inspection_items(self, row):
-        """
-        Create inspection items list based on DataFrame content for a specific row
-        # row = df.iloc[row_index]
-        """
-
-        # Create lists with matching from DataFrame
-        info = [
-            ("User:", str(row['User']) if pd.notna(row['User']) else ""),
-            ("Date:", str(row['Date']) if pd.notna(row['Date']) else ""),
-            ("Version:", str(row['Version']) if pd.notna(row['Version']) else ""),
-            ("Manufacturer:", str(row['Manufacturer']) if pd.notna(row['Manufacturer']) else ""),
-            ("Batch:", str(row['Batch']) if pd.notna(row['Batch']) else ""),
-            ("ID:", str(row['ID']) if pd.notna(row['ID']) else "")
-        ]
-
-        inspection_items = [
-            ("General comments:", "", 2, [34, 0, 42]),
-            ("Flatness:", f"{row['Flatness']}mm", 1, [2, 2]),
-            ("Comments:", "", 0, [25, 0]),
-            ("Thickness measurements:", f"{row['Thickness measurements']}mm", 1, [4, 22]),
-            ("Plating (BGA):", "PASS" if row['Plating (BGA)'] else "FAIL", 1, [4, 8]),
-            ("Plating (Holes):", "PASS" if row['Plating (Holes)'] else "FAIL", 0, [4, 8]),
-            ("Soldermask alignment:", "PASS" if row['Soldermask alignment'] else "FAIL", 1, [4, 26]),
-            ("Glue problems?", "PASS" if row[self.glue_column] else "FAIL", 1, [7, 26]) if self.glue_column else
-            ("Glue problems?", "UNKNOWN", 1, [7, 26]),
-            ("Test coupons (observations, continuity measurements etc.):",
-             "PASS" if row['Test coupons (observations, continuity measurements etc.)'] else "FAIL", 2, [4, 10, 42]),
-            ("Accept?", "PASS" if row['Accept?'] else "FAIL", 1, [4, 12])
-        ]
-
-        gdoc = row['filename+ID'] + '.docx'
-
-        return info, inspection_items, gdoc
-
     #----------------------------------------------------------------------------------------------------
     # Document-related
     #----------------------------------------------------------------------------------------------------
@@ -213,14 +145,23 @@ class QualityControlDocGenerator:
         underlined_spaces.font.color.rgb = color or self.black
         underlined_spaces.font.underline = WD_UNDERLINE.THICK
 
-    def _add_title(self):
+    def _add_title(self, row):
         title = self.doc.add_paragraph("Hexaboard 8\"V3 HD-FUll-HB-V2.2 Quality control traveler document V3")
         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
         title_format = title.runs[0].font
         title_format.size = Pt(14)
         title_format.bold = True
 
-        for i, (key, value) in enumerate(self.info):
+        info = [
+            ("User:", str(row['User']) if pd.notna(row['User']) else ""),
+            ("Date:", str(row['Date']) if pd.notna(row['Date']) else ""),
+            ("Version:", str(row['Version']) if pd.notna(row['Version']) else ""),
+            ("Manufacturer:", str(row['Manufacturer']) if pd.notna(row['Manufacturer']) else ""),
+            ("Batch:", str(row['Batch']) if pd.notna(row['Batch']) else ""),
+            ("ID:", str(row['ID']) if pd.notna(row['ID']) else "")
+        ]
+
+        for i, (key, value) in enumerate(info):
             if i % 3 == 0:
                 p = self.doc.add_paragraph()
 
@@ -264,10 +205,25 @@ class QualityControlDocGenerator:
                 border.append(border_element)
                 tcPr.append(border)
 
-    def _add_first_visual_inspection(self):
+    def _add_first_visual_inspection(self, row):
         self.doc.add_heading("1st Visual Inspection – Bare PCB", level=1)
 
-        for item, value, nLines, spaces in self.inspection_items:
+        inspection_items = [
+            ("General comments:", "", 2, [34, 0, 42]),
+            ("Flatness:", f"{row['Flatness']}mm", 1, [2, 2]),
+            ("Comments:", "", 0, [25, 0]),
+            ("Thickness measurements:", f"{row['Thickness measurements']}mm", 1, [4, 22]),
+            ("Plating (BGA):", "PASS" if row['Plating (BGA)'] else "FAIL", 1, [4, 8]),
+            ("Plating (Holes):", "PASS" if row['Plating (Holes)'] else "FAIL", 0, [4, 8]),
+            ("Soldermask alignment:", "PASS" if row['Soldermask alignment'] else "FAIL", 1, [4, 26]),
+            ("Glue problems?", "PASS" if row[self.glue_column] else "FAIL", 1, [7, 26]) if self.glue_column else
+            ("Glue problems?", "UNKNOWN", 1, [7, 26]),
+            ("Test coupons (observations, continuity measurements etc.):",
+             "PASS" if row['Test coupons (observations, continuity measurements etc.)'] else "FAIL", 2, [4, 10, 42]),
+            ("Accept?", "PASS" if row['Accept?'] else "FAIL", 1, [4, 12])
+        ]
+
+        for item, value, nLines, spaces in inspection_items:
             if 'Accept' in item:
                 paragraph = self.doc.add_paragraph()
                 paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -290,7 +246,7 @@ class QualityControlDocGenerator:
                 p = self.doc.add_paragraph()
                 self._add_underlined_spaces(p, spaces[2])
 
-    def _add_second_visual_inspection(self):
+    def _add_second_visual_inspection(self, row):
         self.doc.add_heading("2nd Visual Inspection – Assembled PCB", level=1)
 
         for item, value, nLines, spaces in self.assembled_items:

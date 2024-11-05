@@ -9,12 +9,16 @@ from docx.oxml.ns import qn
 
 class QualityControlDocGenerator:
     def __init__(self, target_folder, filename, prefix='/content/drive/My Drive/'):
-        self.base = prefix + target_folder
+        self.prefix = prefix if prefix.endswith('/') else prefix + '/' # 確保 prefix 結尾有斜線
+        self.base = os.path.join(self.prefix, target_folder)
         self.filename = filename
-        self.csv = os.path.join(target_folder, filename)
+        self.csv = os.path.join(self.base, filename)
         self.doc = None
         self.black = RGBColor(0, 0, 0)
         self.blue = RGBColor(0, 0, 255)
+
+        print(f">>> {self.base}")
+        print(f">>> {self.csv}")
 
         # Check & Read the CSV
         self._check_folder()

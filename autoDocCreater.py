@@ -54,7 +54,7 @@ class QualityControlDocGenerator:
         """ Create folders based on CERN ID """
         print("[INFO] 建立資料夾：")
         for index, row in self.df.iterrows():
-            sub_folder = os.path.join(self.base, row['CERN ID'])
+            sub_folder = os.path.join(self.base, row['ID'])
             os.makedirs(sub_folder, exist_ok=True)
             print(f"A folder has been created: {sub_folder}")
         print("")
@@ -134,7 +134,8 @@ class QualityControlDocGenerator:
         """
         try:
             # Skip the first two rows and use the third row as headers
-            df = pd.read_csv(self.csv, skiprows=2, header=0)
+            df = pd.read_csv(self.csv, skiprows=2, header=0) # 刪除前兩行
+            df = df.dropna(subset=['User'])  # 刪除 User 欄位為空的列
             df.columns = [str(col).strip().replace('\n', ' ') for col in df.columns]
             # self._inspect_contents(df)
             return df
@@ -150,7 +151,7 @@ class QualityControlDocGenerator:
             print(f"{i}: '{col}'")
 
         # Print the first few rows of data
-        keywords = ['CERN ID', 'Accept?', 'Filename', 'Photo']
+        keywords = ['ID', 'Accept?', 'filename+ID', 'image link']
         print("\nFirst few rows of data (selected columns):")
         print(df[keywords].head())
 
@@ -174,14 +175,14 @@ class QualityControlDocGenerator:
             ("Version:", str(row['Version']) if pd.notna(row['Version']) else ""),
             ("Manufacturer:", str(row['Manufacturer']) if pd.notna(row['Manufacturer']) else ""),
             ("Batch:", str(row['Batch']) if pd.notna(row['Batch']) else ""),
-            ("ID:", str(row['CERN ID']) if pd.notna(row['CERN ID']) else "")
+            ("ID:", str(row['ID']) if pd.notna(row['ID']) else "")
         ]
 
         inspection_items = [
             ("General comments:", "", 2, [34, 0, 42]),
             ("Flatness:", f"{row['Flatness']}mm", 1, [2, 2]),
             ("Comments:", "", 0, [25, 0]),
-            ("Thickness measurements:", f"{row['Thickness']}mm", 1, [4, 22]),
+            ("Thickness measurements:", f"{row['Thickness measurements']}mm", 1, [4, 22]),
             ("Plating (BGA):", "PASS" if row['Plating (BGA)'] else "FAIL", 1, [4, 8]),
             ("Plating (Holes):", "PASS" if row['Plating (Holes)'] else "FAIL", 0, [4, 8]),
             ("Soldermask alignment:", "PASS" if row['Soldermask alignment'] else "FAIL", 1, [4, 26]),
@@ -192,7 +193,7 @@ class QualityControlDocGenerator:
             ("Accept?", "PASS" if row['Accept?'] else "FAIL", 1, [4, 12])
         ]
 
-        gdoc = row['Filename'] + '.docx'
+        gdoc = row['filename+ID'] + '.docx'
 
         return info, inspection_items, gdoc
 

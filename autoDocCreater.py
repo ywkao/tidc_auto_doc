@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import docx
 from docx.shared import Pt, RGBColor, Inches
@@ -6,8 +7,8 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
 class QualityControlDocGenerator:
-    def __init__(self, target_folder, filename):
-        self.base = '/content/drive/My Drive/' + target_folder
+    def __init__(self, target_folder, filename, prefix='/content/drive/My Drive/'):
+        self.base = prefix + target_folder
         self.filename = filename
         self.csv = os.path.join(target_folder, filename)
         self.doc = None
@@ -52,7 +53,7 @@ class QualityControlDocGenerator:
     def create_directories(self):
         """ Create folders based on CERN ID """
         for index, row in self.df.iterrows():
-            sub_folder = os.path.join(self.folder, row['CERN ID'])
+            sub_folder = os.path.join(self.base, row['CERN ID'])
             os.makedirs(sub_folder, exist_ok=True)
 
     def create_documents(self):

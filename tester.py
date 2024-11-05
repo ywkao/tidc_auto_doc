@@ -1,5 +1,5 @@
-from tidc_auto_doc import autoDocCreater
+from autoDocCreater import QualityControlDocGenerator
 
-tester = autoDocCreater.QualityControlDocGenerator('autoDoc', 'test.csv')
+tester = QualityControlDocGenerator('autoDoc', 'test.csv', './')
 
 print(tester.create_directories())

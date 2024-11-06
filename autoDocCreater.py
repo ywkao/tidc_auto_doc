@@ -57,10 +57,10 @@ class QualityControlDocGenerator:
 
         self.doc = docx.Document()
         self._set_page_margins()
-        self._add_title(row)
+        self._add_title(row, 'title page1')
         self._add_first_visual_inspection(row)
         self.doc.add_page_break()
-        self._add_title(row)
+        self._add_title(row, 'title page2')
         self._add_second_visual_inspection(row)
         self.doc.save(self.output_file)
         print(f"Document has been saved as {self.output_file}")
@@ -146,8 +146,8 @@ class QualityControlDocGenerator:
         underlined_spaces = paragraph.add_run(space * Nspaces)
         underlined_spaces.font.color.rgb = color or self.black
 
-    def _add_title(self, row):
-        title = self.doc.add_paragraph("Hexaboard 8\"V3 HD-FUll-HB-V2.2 Quality control traveler document V3")
+    def _add_title(self, row, titleKey):
+        title = self.doc.add_paragraph(str(row[titleKey]))
         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
         title_format = title.runs[0].font
         title_format.size = Pt(14)
@@ -173,7 +173,7 @@ class QualityControlDocGenerator:
             run = p.add_run(value)
             run.font.underline = WD_UNDERLINE.THICK
             run.font.color.rgb = self.blue
-            self._add_underlined_spaces(p, 4 - (i // 5))
+            self._add_underlined_spaces(p, 2)
 
     def _add_formatted_table(self, row):
         # 添加新的1x2表格
@@ -246,16 +246,16 @@ class QualityControlDocGenerator:
         self.doc.add_heading("1st Visual Inspection – Bare PCB", level=1)
 
         inspection_items = [
-            ("General comments:"       , f"{row['General comments']}"         , 2 , [34, 0, 42]),
-            ("Flatness:"               , f"{row['Flatness']}"                 , 1 , [2  , 2])  ,
-            ("Comments:"               , f"{row['Comments']}"                 , 0 , [25 , 0])  ,
-            ("Thickness measurements:" , f"{row['Thickness measurements']}mm" , 1 , [4  , 22]) ,
-            ("Plating (BGA):"          , f"{row['Plating (BGA)']}"            , 1 , [4  , 8])  ,
-            ("Plating (Holes):"        , f"{row['Plating (Holes)']}"          , 0 , [4  , 8])  ,
-            ("Soldermask alignment:"   , f"{row['Soldermask alignment']}"     , 1 , [4  , 26]) ,
-            ("Glue problems?"          , f"{row['Glue problems?']}"           , 1 , [7  , 26]) ,
+            ("General comments:"       , f"{row['General comments']}"       , 2 , [34, 0, 42]),
+            ("Flatness:"               , f"{row['Flatness']}"               , 1 , [2  , 2])  ,
+            ("Comments:"               , f"{row['Comments']}"               , 0 , [25 , 0])  ,
+            ("Thickness measurements:" , f"{row['Thickness measurements']}" , 1 , [4  , 22]) ,
+            ("Plating (BGA):"          , f"{row['Plating (BGA)']}"          , 1 , [4  , 8])  ,
+            ("Plating (Holes):"        , f"{row['Plating (Holes)']}"        , 0 , [4  , 8])  ,
+            ("Soldermask alignment:"   , f"{row['Soldermask alignment']}"   , 1 , [4  , 26]) ,
+            ("Glue problems?"          , f"{row['Glue problems?']}"         , 1 , [7  , 26]) ,
             ("Test coupons (observations, continuity measurements etc.):", f"{row['Test coupons (observations, continuity measurements etc.)']}" , 2, [4, 10, 42]),
-            ("Accept?"                 , f"{row['Accept?']}"                  , 1 , [4  , 12]),
+            ("Accept?"                 , f"{row['Accept?']}"                , 1 , [4  , 12]),
         ]
 
         for item, value, nLines, spaces in inspection_items:
@@ -292,7 +292,6 @@ class QualityControlDocGenerator:
             self._add_customized_paragraph(p, item, value, spaces)
 
         # Table for chip ID and location map
-        self.doc.add_paragraph()
         self._add_formatted_table(row)
 
         # Functional tests

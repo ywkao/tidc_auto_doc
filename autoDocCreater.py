@@ -57,10 +57,10 @@ class QualityControlDocGenerator:
 
         self.doc = docx.Document()
         self._set_page_margins()
-        self._add_title(row, 'title page1')
+        self._add_title(row, 'title page1', 'ID')
         self._add_first_visual_inspection(row)
         self.doc.add_page_break()
-        self._add_title(row, 'title page2')
+        self._add_title(row, 'title page2', 'p2_ID')
         self._add_second_visual_inspection(row)
         self.doc.save(self.output_file)
         print(f"Document has been saved as {self.output_file}")
@@ -146,7 +146,7 @@ class QualityControlDocGenerator:
         underlined_spaces = paragraph.add_run(space * Nspaces)
         underlined_spaces.font.color.rgb = color or self.black
 
-    def _add_title(self, row, titleKey):
+    def _add_title(self, row, titleKey, idKey):
         title = self.doc.add_paragraph(str(row[titleKey]))
         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
         title_format = title.runs[0].font
@@ -159,7 +159,7 @@ class QualityControlDocGenerator:
             ("Version:", str(row['Version']) if pd.notna(row['Version']) else ""),
             ("Manufacturer:", str(row['Manufacturer']) if pd.notna(row['Manufacturer']) else ""),
             ("Batch:", str(row['Batch']) if pd.notna(row['Batch']) else ""),
-            ("ID:", str(row['ID']) if pd.notna(row['ID']) else "")
+            ("ID:", str(row['ID']) if pd.notna(row[idKey]) else "")
         ]
 
         for i, (key, value) in enumerate(info):
@@ -179,33 +179,31 @@ class QualityControlDocGenerator:
         # 添加新的1x2表格
         new_table = self.doc.add_table(rows=1, cols=2)
         new_table.style = 'Normal Table'
+        new_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+
+        # Set column widths
+        new_table.columns[0].width = Inches(2)
+        new_table.columns[1].width = Inches(4)
 
         # Add chip ID & chip map
         for i, cell in enumerate(new_table.rows[0].cells):
             cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
             if i==0:
-                # cell.width = Inches(2)
                 paragraph = cell.add_paragraph()
                 paragraph.add_run(f"{row['p2_Chip ID']}")
             elif i==1:
-                # cell.width = Inches(4)
-                self._add_image_to_cell(cell, row.get('p2_Chip location map link', ''))
+                p = cell.add_paragraph()
+                self._add_image(p, row.get('p2_Chip location map link', ''))
 
-    def _add_image_to_cell(self, cell, image_link, default_width=3):
-        """
-        Adds an image to a table cell with error handling.
-
-        Args:
-            cell: The table cell to add the image to
-            image_link: The path to the image
-            default_width: Width in inches for the image (default: 3)
-
-        Returns:
-            bool: True if image was added successfully, False otherwise
-        """
-        paragraph = cell.add_paragraph()
+    def _add_image(self, paragraph, image_link, default_width=4):
+        image_path = os.path.join(self.base, image_link)
         paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = paragraph.add_run()
+        run.add_picture(image_path, width=Inches(default_width))
+        print(f'+ adding picture: {image_path}')
 
+    #TODO: need to integrate image check
+    def _check_image_link(self, image_link):
         if not image_link or not image_link.strip():
             run = paragraph.add_run("No image available")
             run.italic = True
@@ -260,12 +258,8 @@ class QualityControlDocGenerator:
 
         for item, value, nLines, spaces in inspection_items:
             if 'Accept' in item:
-                image_path = os.path.join(self.base, row['image link'])
-                paragraph = self.doc.add_paragraph()
-                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                run = paragraph.add_run()
-                run.add_picture(image_path, height=Inches(3))
-                # print(f'[INFO] add picture: {image_path}')
+                p = self.doc.add_paragraph()
+                self._add_image(p, row['image link'])
 
             if nLines > 0: p = self.doc.add_paragraph()
             self._add_customized_paragraph(p, item, value, spaces)
@@ -294,13 +288,17 @@ class QualityControlDocGenerator:
         # Table for chip ID and location map
         self._add_formatted_table(row)
 
+        # Photo at 2nd visual inspection
+        p = self.doc.add_paragraph()
+        self._add_image(p, row['p2_image link'])
+
         # Functional tests
         self.doc.add_heading("Functional Tests", level=1)
         functional_tests = [
-            ("Power-on current:" , f"{row['p2_Power-on current']}" , 1, [4, 10]),
-            ("Configured OK:"    , f"{row['p2_Configured OK']}"    , 0, [0,  0]),
-            ("Operating current:", f"{row['p2_Operating current']}", 0, [4, 10]),
-            ("DAQ lines OK: "    , f"{row['p2_DAQ lines OK']}"     , 1, [0,  0]),
+            ("Power-on current:" , f"{row['p2_Power-on current']}" , 1, [2, 2]),
+            ("Configured OK:"    , f"{row['p2_Configured OK']}"    , 0, [0, 0]),
+            ("Operating current:", f"{row['p2_Operating current']}", 0, [2, 2]),
+            ("DAQ lines OK: "    , f"{row['p2_DAQ lines OK']}"     , 1, [0, 0]),
         ]
 
         for item, value, nLines, spaces in functional_tests:

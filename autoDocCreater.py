@@ -8,6 +8,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
 class QualityControlDocGenerator:
+    """ auto generator """
     def __init__(self, target_folder, filename, prefix='/content/drive/My Drive/'):
         self.prefix = prefix if prefix.endswith('/') else prefix + '/' # 確保 prefix 結尾有斜線
         self.base = os.path.join(self.prefix, target_folder)

@@ -8,7 +8,8 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
 class QualityControlDocGenerator:
-    def __init__(self, target_folder, filename, prefix='/content/drive/My Drive/'):
+    def __init__(self, target_folder, filename, drive='My Drive', prefix='/content/drive/'):
+        prefix = os.path.join(prefix, drive)
         self.prefix = prefix if prefix.endswith('/') else prefix + '/' # 確保 prefix 結尾有斜線
         self.base = os.path.join(self.prefix, target_folder)
         self.filename = filename
@@ -40,6 +41,33 @@ class QualityControlDocGenerator:
             print(f"A folder has been created: {sub_folder}")
         print("")
 
+    def move_photos(self):
+        """ Move photos to sub-directories (CERN ID) """
+        print("[INFO] 移動相片：")
+        for index, row in self.df.iterrows():
+            self.cernID = row['ID']
+            self.folder = os.path.join(self.base, row['ID'])
+            os.makedirs(self.folder, exist_ok=True)
+
+            flag, _ = self._find_image_path(image_link=row['image link'], verbosity=True)
+            if flag==1: self._move_single_photo(self.base, self.folder, row['image link'])
+
+            flag, _ = self._find_image_path(image_link=row['p2_image link'], verbosity=True)
+            if flag==1: self._move_single_photo(self.base, self.folder, row['p2_image link'])
+
+    def move_back_photos(self):
+        """ Move back photos to sub-directories (CERN ID) """
+        print("[INFO] 還原相片位置：")
+        for index, row in self.df.iterrows():
+            self.folder = os.path.join(self.base, row['ID'])
+            os.makedirs(self.folder, exist_ok=True)
+
+            flag, _ = self._find_image_path(row['image link'])
+            if flag==2: self._move_single_photo(self.folder, self.base, row['image link'])
+
+            flag, _ = self._find_image_path(row['p2_image link'])
+            if flag==2: self._move_single_photo(self.folder, self.base, row['p2_image link'])
+
     def create_documents(self):
         """ Create documents """
         print("[INFO] 建立docx文件：")
@@ -49,6 +77,12 @@ class QualityControlDocGenerator:
     #----------------------------------------------------------------------------------------------------
     # auxiliary modules
     #----------------------------------------------------------------------------------------------------
+    def _move_single_photo(self, base, new, photo):
+        path1 = os.path.join(base, photo)
+        path2 = os.path.join(new, photo)
+        os.rename(path1, path2)
+        print(f"- mv {path1} {path2}")
+
     def _create_quality_control_doc(self, row):
         self.cernID = row['ID']
         self.folder = os.path.join(self.base, self.cernID)
@@ -193,41 +227,38 @@ class QualityControlDocGenerator:
                 paragraph.add_run(f"{row['p2_Chip ID']}")
             elif i==1:
                 p = cell.add_paragraph()
-                self._add_image(p, row.get('p2_Chip location map link', ''))
+                self._process_image(p, row.get('p2_Chip location map link', ''))
 
-    def _add_image(self, paragraph, image_link, default_width=4):
-        image_path = os.path.join(self.base, image_link)
+    def _process_image(self, p, link):
+        _, image_path = self._find_image_path(link)
+        if image_path is not None:
+            self._add_image(p, image_path)
+
+    def _find_image_path(self, image_link, verbosity=False):
+        if not image_link or not image_link.strip():
+            return 0, None
+
+        potential_paths = [
+            os.path.join(self.base, image_link),
+            os.path.join(self.folder, image_link)
+        ]
+
+        for i, path in enumerate(potential_paths):
+            if os.path.exists(path):
+                return i+1, path
+
+        if verbosity:
+            self._print_error(f"[ERROR] {image_link} not found for {self.cernID}")
+        return 3, None
+
+    def _print_error(self, message: str) -> None:
+        print(f"\033[91m[ERROR] {message}\033[0m")
+
+    def _add_image(self, paragraph, image_path, default_width=4):
         paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run = paragraph.add_run()
         run.add_picture(image_path, width=Inches(default_width))
         print(f'+ adding picture: {image_path}')
-
-    #TODO: need to integrate image check
-    def _check_image_link(self, image_link):
-        if not image_link or not image_link.strip():
-            run = paragraph.add_run("No image available")
-            run.italic = True
-            return False
-
-        try:
-            image_path = os.path.join(self.base, image_link)
-            if not os.path.exists(image_path):
-                run = paragraph.add_run("Image file not found")
-                run.italic = True
-                run.font.color.rgb = RGBColor(255, 0, 0)
-                return False
-
-            run = paragraph.add_run()
-            run.add_picture(image_path, height=Inches(default_width))
-            return True
-
-        except Exception as e:
-            # Log the error if needed
-            print(f"Error adding image: {str(e)}")
-            run = paragraph.add_run("Error loading image")
-            run.italic = True
-            run.font.color.rgb = RGBColor(255, 0, 0)
-            return False
 
     def _add_customized_paragraph(self, paragraph, item, value, spaces):
         useEmptySpace = (spaces[0]==0) and (spaces[1]==0)
@@ -259,7 +290,7 @@ class QualityControlDocGenerator:
         for item, value, nLines, spaces in inspection_items:
             if 'Accept' in item:
                 p = self.doc.add_paragraph()
-                self._add_image(p, row['image link'])
+                self._process_image(p, row.get('image link', ''))
 
             if nLines > 0: p = self.doc.add_paragraph()
             self._add_customized_paragraph(p, item, value, spaces)
@@ -290,7 +321,7 @@ class QualityControlDocGenerator:
 
         # Photo at 2nd visual inspection
         p = self.doc.add_paragraph()
-        self._add_image(p, row['p2_image link'])
+        self._process_image(p, row.get('p2_image link', ''))
 
         # Functional tests
         self.doc.add_heading("Functional Tests", level=1)

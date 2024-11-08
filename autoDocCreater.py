@@ -248,7 +248,7 @@ class QualityControlDocGenerator:
                 return i+1, path
 
         if verbosity:
-            self._print_error(f"[ERROR] {image_link} not found for {self.cernID}")
+            self._print_error(f"{image_link} not found for {self.cernID}")
         return 3, None
 
     def _print_error(self, message: str) -> None:

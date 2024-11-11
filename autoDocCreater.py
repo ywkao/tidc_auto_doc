@@ -193,7 +193,7 @@ class QualityControlDocGenerator:
             ("Version:", str(row['Version']) if pd.notna(row['Version']) else ""),
             ("Manufacturer:", str(row['Manufacturer']) if pd.notna(row['Manufacturer']) else ""),
             ("Batch:", str(row['Batch']) if pd.notna(row['Batch']) else ""),
-            ("ID:", str(row['p2_ID']) if pd.notna(row[idKey]) else "")
+            ("ID:", str(row[idKey]) if pd.notna(row[idKey]) else "")
         ]
 
         for i, (key, value) in enumerate(info):

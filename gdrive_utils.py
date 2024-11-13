@@ -36,6 +36,7 @@ def safe_move(path1, path2):
     try:
         # Check if we're in Colab and dealing with Google Drive paths
         if is_colab() and (is_gdrive_path(path1) or is_gdrive_path(path2)):
+            print(f"[debug] system: google colab")
             try:
                 from gdrive_utils import safe_move_file  # Your Google Drive specific code
                 return safe_move_file(path1, path2)
@@ -47,6 +48,7 @@ def safe_move(path1, path2):
         else:
             # Handle different operating systems
             system = platform.system().lower()
+            print(f"[debug] system: {system}")
             
             if system == 'darwin':  # macOS
                 os.rename(path1, path2)

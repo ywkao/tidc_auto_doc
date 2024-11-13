@@ -49,11 +49,11 @@ class QualityControlDocGenerator:
             self.folder = os.path.join(self.base, row['ID'])
             os.makedirs(self.folder, exist_ok=True)
 
-            flag, _ = self._find_image_path(image_link=row['image link'], verbosity=True)
-            if flag==1: self._move_single_photo(self.base, self.folder, row['image link'])
+            flag, _ = self._find_path(link=row['image link'], verbosity=True)
+            if flag==1: self._move_file(self.base, self.folder, row['image link'])
 
-            flag, _ = self._find_image_path(image_link=row['p2_image link'], verbosity=True)
-            if flag==1: self._move_single_photo(self.base, self.folder, row['p2_image link'])
+            flag, _ = self._find_path(link=row['p2_image link'], verbosity=True)
+            if flag==1: self._move_file(self.base, self.folder, row['p2_image link'])
 
     def move_back_photos(self):
         """ Move back photos to sub-directories (CERN ID) """
@@ -62,11 +62,11 @@ class QualityControlDocGenerator:
             self.folder = os.path.join(self.base, row['ID'])
             os.makedirs(self.folder, exist_ok=True)
 
-            flag, _ = self._find_image_path(row['image link'])
-            if flag==2: self._move_single_photo(self.folder, self.base, row['image link'])
+            flag, _ = self._find_path(row['image link'])
+            if flag==2: self._move_file(self.folder, self.base, row['image link'])
 
-            flag, _ = self._find_image_path(row['p2_image link'])
-            if flag==2: self._move_single_photo(self.folder, self.base, row['p2_image link'])
+            flag, _ = self._find_path(row['p2_image link'])
+            if flag==2: self._move_file(self.folder, self.base, row['p2_image link'])
 
     def create_documents(self):
         """ Create documents """
@@ -74,18 +74,29 @@ class QualityControlDocGenerator:
         for index, row in self.df.iterrows():
             self._create_quality_control_doc(row)
 
+    def move_docx(self):
+        print("[INFO] 移動docx文件：")
+        for index, row in self.df.iterrows():
+            self.cernID = row['ID']
+            self.folder = os.path.join(self.base, row['ID'])
+            os.makedirs(self.folder, exist_ok=True)
+
+            self.gdoc = row['filename+ID'] + '.docx'
+            flag, _ = self._find_path(link=self.gdoc, verbosity=True)
+            if flag==1: self._move_file(self.base, self.folder, self.gdoc)
+
     #----------------------------------------------------------------------------------------------------
     # auxiliary modules
     #----------------------------------------------------------------------------------------------------
-    def _move_single_photo(self, base, new, photo):
-        path1 = os.path.join(base, photo)
-        path2 = os.path.join(new, photo)
+    def _move_file(self, old, new, f):
+        path1 = os.path.join(old, f)
+        path2 = os.path.join(new, f)
         os.rename(path1, path2)
         print(f"- mv {path1} {path2}")
 
     def _create_quality_control_doc(self, row):
         self.cernID = row['ID']
-        self.folder = os.path.join(self.base, self.cernID)
+        self.folder = os.path.join(self.base, '.') # self.cernID
         self.gdoc = row['filename+ID'] + '.docx'
         self.output_file = os.path.join(self.folder, self.gdoc)
 
@@ -229,18 +240,18 @@ class QualityControlDocGenerator:
                 p = cell.add_paragraph()
                 self._process_image(p, row.get('p2_Chip location map link', ''))
 
-    def _process_image(self, p, link):
-        _, image_path = self._find_image_path(link)
+    def _process_image(self, p, image_link):
+        _, image_path = self._find_path(image_link)
         if image_path is not None:
             self._add_image(p, image_path)
 
-    def _find_image_path(self, image_link, verbosity=False):
-        if not image_link or not image_link.strip():
+    def _find_path(self, link, verbosity=False):
+        if not link or not link.strip():
             return 0, None
 
         potential_paths = [
-            os.path.join(self.base, image_link),
-            os.path.join(self.folder, image_link)
+            os.path.join(self.base, link),
+            os.path.join(self.folder, link)
         ]
 
         for i, path in enumerate(potential_paths):
@@ -248,7 +259,7 @@ class QualityControlDocGenerator:
                 return i+1, path
 
         if verbosity:
-            self._print_error(f"{image_link} not found for {self.cernID}")
+            self._print_error(f"{link} not found for {self.cernID}")
         return 3, None
 
     def _print_error(self, message: str) -> None:

@@ -97,9 +97,13 @@ class QualityControlDocGenerator:
 
     def _create_quality_control_doc(self, row):
         self.cernID = row['ID']
-        self.folder = os.path.join(self.base, '.') # self.cernID
+        self.folder = os.path.join(self.base, self.cernID) 
         self.gdoc = row['filename+ID'] + '.docx'
-        self.output_file = os.path.join(self.folder, self.gdoc)
+
+        # 1st step: crreate doc at the base directory
+        # 2nd step: move the doc to the target folder
+        # this 2-step treatment will allow to copy links from Google Drive to excel
+        self.output_file = os.path.join(self.base, self.gdoc) 
 
         self.doc = docx.Document()
         self._set_page_margins()
@@ -204,7 +208,7 @@ class QualityControlDocGenerator:
             ("Date:", str(row['Date']) if pd.notna(row['Date']) else ""),
             ("Version:", str(row['Version']) if pd.notna(row['Version']) else ""),
             ("Manufacturer:", str(row['Manufacturer']) if pd.notna(row['Manufacturer']) else ""),
-            ("Batch:", str(row['Batch']) if pd.notna(row['Batch']) else ""),
+            ("Batch:", str(int(row['Batch'])) if pd.notna(row['Batch']) else ""),
             ("ID:", str(row[idKey]) if pd.notna(row[idKey]) else "")
         ]
 
@@ -241,18 +245,13 @@ class QualityControlDocGenerator:
                 p = cell.add_paragraph()
                 self._process_image(p, row.get('p2_Chip location map link', ''))
 
-    def _process_image(self, p, image_link):
-        _, image_path = self._find_path(image_link)
-        if image_path is not None:
-            self._add_image(p, image_path)
-
     def _find_path(self, link, verbosity=False):
         if not link or not link.strip():
             return 0, None
 
         potential_paths = [
-            os.path.join(self.base, link),
-            os.path.join(self.folder, link)
+            os.path.join(self.base, link), # 1
+            os.path.join(self.folder, link) # 2
         ]
 
         for i, path in enumerate(potential_paths):
@@ -263,10 +262,15 @@ class QualityControlDocGenerator:
             self._print_error(f"{link} not found for {self.cernID}")
         return 3, None
 
+    def _process_image(self, p, image_link):
+        _, image_path = self._find_path(image_link)
+        if image_path is not None:
+            self._add_image(p, image_path)
+
     def _print_error(self, message: str) -> None:
         print(f"\033[91m[ERROR] {message}\033[0m")
 
-    def _add_image(self, paragraph, image_path, default_width=4):
+    def _add_image(self, paragraph, image_path, default_width=3.5):
         paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run = paragraph.add_run()
         run.add_picture(image_path, width=Inches(default_width))

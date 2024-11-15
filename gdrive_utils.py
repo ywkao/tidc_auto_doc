@@ -2,6 +2,8 @@ import os
 import platform
 import sys
 
+import safe_move as sm
+
 def is_colab():
     """Check if code is running in Google Colab"""
     try:
@@ -22,7 +24,7 @@ def is_gdrive_path(path):
     ]
     return any(indicator in path for indicator in gdrive_indicators)
 
-def safe_move(path1, path2):
+def safe_move(drive, path1, path2):
     """
     Cross-platform safe move operation
     
@@ -37,8 +39,8 @@ def safe_move(path1, path2):
         # Check if we're in Colab and dealing with Google Drive paths
         if is_colab() and (is_gdrive_path(path1) or is_gdrive_path(path2)):
             try:
-                from gdrive_utils import safe_move_file  # Your Google Drive specific code
-                return safe_move_file(path1, path2)
+                sm.move_shared_drive_file(drive, path1, path2)
+
             except ImportError:
                 print("Google Drive utilities not found. Please ensure gdrive_utils.py is available.")
                 return False
@@ -62,11 +64,11 @@ def safe_move(path1, path2):
         print(f"Error moving file: {str(e)}")
         return False
 
-def move_file(path1, path2):
+def move_file(drive, path1, path2):
     """
     User-friendly wrapper for file moving operations
     """
-    if safe_move(path1, path2):
+    if safe_move(drive, path1, path2):
         print(f"- moved file from {path1} to {path2}")
     else:
         print("Failed to move file")

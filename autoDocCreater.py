@@ -11,6 +11,7 @@ import gdrive_utils as gu
 
 class QualityControlDocGenerator:
     def __init__(self, target_folder, filename, drive='My Drive', prefix='/content/drive/'):
+        self.drive = drive
         prefix = os.path.join(prefix, drive)
         self.prefix = prefix if prefix.endswith('/') else prefix + '/' # 確保 prefix 結尾有斜線
         self.base = os.path.join(self.prefix, target_folder)
@@ -93,7 +94,7 @@ class QualityControlDocGenerator:
     def _move_file(self, old, new, f):
         path1 = os.path.join(old, f)
         path2 = os.path.join(new, f)
-        gu.move_file(path1, path2)
+        gu.move_file(self.drive, path1, path2)
 
     def _create_quality_control_doc(self, row):
         self.cernID = row['ID']

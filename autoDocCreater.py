@@ -7,7 +7,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_UNDERLINE
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
-import gdrive_utils as gu
+# import gdrive_utils as gu
 
 class QualityControlDocGenerator:
     def __init__(self, target_folder, filename, drive='My Drive', prefix='/content/drive/'):
@@ -94,7 +94,9 @@ class QualityControlDocGenerator:
     def _move_file(self, old, new, f):
         path1 = os.path.join(old, f)
         path2 = os.path.join(new, f)
-        gu.move_file(self.drive, path1, path2)
+        os.rename(path1, path2)
+        print(f"- moved file from {path1} to {path2}")
+        # gu.move_file(self.drive, path1, path2)
 
     def _create_quality_control_doc(self, row):
         self.cernID = row['ID']

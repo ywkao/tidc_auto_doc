@@ -147,7 +147,7 @@ class QualityControlDocGenerator:
         """
         try:
             # Skip the first two rows and use the third row as headers
-            df = pd.read_csv(self.csv, skiprows=2, header=0) # 刪除前兩行
+            df = pd.read_csv(self.csv, skiprows=2, header=0, dtype=str) # 刪除前兩行
             df = df.dropna(subset=['User'])  # 刪除 User 欄位為空的列
             df = df.fillna('') # replace all NaN with empty strings
             df.columns = [str(col).strip().replace('\n', ' ') for col in df.columns]
@@ -205,12 +205,12 @@ class QualityControlDocGenerator:
         title_format.bold = True
 
         info = [
-            ("User:", str(row['User']) if pd.notna(row['User']) else ""),
-            ("Date:", str(row['Date']) if pd.notna(row['Date']) else ""),
-            ("Version:", str(row['Version']) if pd.notna(row['Version']) else ""),
-            ("Manufacturer:", str(row['Manufacturer']) if pd.notna(row['Manufacturer']) else ""),
-            ("Batch:", str(int(row['Batch'])) if pd.notna(row['Batch']) else ""),
-            ("ID:", str(row[idKey]) if pd.notna(row[idKey]) else "")
+            ("User:"         , row['User']         if pd.notna(row['User'])         else "") ,
+            ("Date:"         , row['Date']         if pd.notna(row['Date'])         else "") ,
+            ("Version:"      , row['Version']      if pd.notna(row['Version'])      else "") ,
+            ("Manufacturer:" , row['Manufacturer'] if pd.notna(row['Manufacturer']) else "") ,
+            ("Batch:"        , row['Batch number'] if pd.notna(row['Batch number']) else "") ,
+            ("ID:"           , row[idKey]          if pd.notna(row[idKey])          else "")
         ]
 
         for i, (key, value) in enumerate(info):
@@ -225,6 +225,11 @@ class QualityControlDocGenerator:
             run.font.underline = WD_UNDERLINE.THICK
             run.font.color.rgb = self.blue
             self._add_underlined_spaces(p, 2)
+
+    def _process_image(self, p, image_link):
+        _, image_path = self._find_path(image_link)
+        if image_path is not None:
+            self._add_image(p, image_path)
 
     def _add_formatted_table(self, row):
         # 添加新的1x2表格
@@ -263,11 +268,6 @@ class QualityControlDocGenerator:
             self._print_error(f"{link} not found for {self.cernID}")
         return 3, None
 
-    def _process_image(self, p, image_link):
-        _, image_path = self._find_path(image_link)
-        if image_path is not None:
-            self._add_image(p, image_path)
-
     def _print_error(self, message: str) -> None:
         print(f"\033[91m[ERROR] {message}\033[0m")
 
@@ -292,16 +292,16 @@ class QualityControlDocGenerator:
         self.doc.add_heading("1st Visual Inspection – Bare PCB", level=1)
 
         inspection_items = [
-            ("General comments:"       , f"{row['General comments']}"       , 2 , [34, 0, 42]),
-            ("Flatness:"               , f"{row['Flatness']}"               , 1 , [2  , 2])  ,
-            ("Comments:"               , f"{row['Comments']}"               , 0 , [25 , 0])  ,
-            ("Thickness measurements:" , f"{row['Thickness measurements']}" , 1 , [4  , 22]) ,
-            ("Plating (BGA):"          , f"{row['Plating (BGA)']}"          , 1 , [4  , 8])  ,
-            ("Plating (Holes):"        , f"{row['Plating (Holes)']}"        , 0 , [4  , 8])  ,
-            ("Soldermask alignment:"   , f"{row['Soldermask alignment']}"   , 1 , [4  , 26]) ,
-            ("Glue problems?"          , f"{row['Glue problems?']}"         , 1 , [7  , 26]) ,
-            ("Test coupons (observations, continuity measurements etc.):", f"{row['Test coupons (observations, continuity measurements etc.)']}" , 2, [4, 10, 42]),
-            ("Accept?"                 , f"{row['Accept?']}"                , 1 , [4  , 12]),
+            ("General comments:"       , row['General comments']       , 2 , [34, 0, 42]),
+            ("Flatness:"               , row['Flatness']               , 1 , [2  , 2])  ,
+            ("Comments:"               , row['Comments']               , 0 , [25 , 0])  ,
+            ("Thickness measurements:" , row['Thickness measurements'] , 1 , [4  , 22]) ,
+            ("Plating (BGA):"          , row['Plating (BGA)']          , 1 , [4  , 8])  ,
+            ("Plating (Holes):"        , row['Plating (Holes)']        , 0 , [4  , 8])  ,
+            ("Soldermask alignment:"   , row['Soldermask alignment']   , 1 , [4  , 26]) ,
+            ("Glue problems?"          , row['Glue problems?']         , 1 , [7  , 26]) ,
+            ("Test coupons (observations, continuity measurements etc.):", row['Test coupons (observations, continuity measurements etc.)'] , 2, [4, 10, 42]),
+            ("Accept?"                 , row['Accept?']                , 1 , [4  , 12]),
         ]
 
         for item, value, nLines, spaces in inspection_items:
@@ -321,12 +321,12 @@ class QualityControlDocGenerator:
 
         # Assembling data
         assembled_items = [
-            ("General comments:"    , f"{row['p2_General comments']}"    , 1, [4, 29]),
-            ("Flatness:"            , f"{row['p2_Flatness']}"            , 1, [4, 30]),
-            ("HGCROC type:"         , f"{row['p2_HGCROC type']}"         , 1, [4,  8]),
-            ("HGCROC rotation:"     , f"{row['p2_HGCROC rotation']}"     , 0, [4,  8]),
-            ("Connectors:"          , f"{row['p2_Connectors']}"          , 1, [4,  8]),
-            ("Resistors/capacitors:", f"{row['p2_Resistors/capacitors']}", 0, [4,  8]),
+            ("General comments:"    , row['p2_General comments']    , 1, [4, 29]),
+            ("Flatness:"            , row['p2_Flatness']            , 1, [4, 30]),
+            ("HGCROC type:"         , row['p2_HGCROC type']         , 1, [4,  8]),
+            ("HGCROC rotation:"     , row['p2_HGCROC rotation']     , 0, [4,  8]),
+            ("Connectors:"          , row['p2_Connectors']          , 1, [4,  8]),
+            ("Resistors/capacitors:", row['p2_Resistors/capacitors'], 0, [4,  8]),
         ]
 
         for item, value, nLines, spaces in assembled_items:
@@ -343,10 +343,10 @@ class QualityControlDocGenerator:
         # Functional tests
         self.doc.add_heading("Functional Tests", level=1)
         functional_tests = [
-            ("Power-on current:" , f"{row['p2_Power-on current']}" , 1, [2, 2]),
-            ("Configured OK:"    , f"{row['p2_Configured OK']}"    , 0, [0, 0]),
-            ("Operating current:", f"{row['p2_Operating current']}", 0, [2, 2]),
-            ("DAQ lines OK: "    , f"{row['p2_DAQ lines OK']}"     , 1, [0, 0]),
+            ("Power-on current:" , row['p2_Power-on current'] , 1, [2, 2]),
+            ("Configured OK:"    , row['p2_Configured OK']    , 0, [0, 0]),
+            ("Operating current:", row['p2_Operating current'], 0, [2, 2]),
+            ("DAQ lines OK: "    , row['p2_DAQ lines OK']     , 1, [0, 0]),
         ]
 
         for item, value, nLines, spaces in functional_tests:

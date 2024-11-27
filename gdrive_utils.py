@@ -2,7 +2,7 @@ import os
 import platform
 import sys
 
-import safe_move as sm
+# import safe_move as sm
 
 def is_colab():
     """Check if code is running in Google Colab"""
@@ -39,7 +39,8 @@ def safe_move(drive, path1, path2):
         # Check if we're in Colab and dealing with Google Drive paths
         if is_colab() and (is_gdrive_path(path1) or is_gdrive_path(path2)):
             try:
-                sm.move_shared_drive_file(drive, path1, path2)
+                # sm.move_shared_drive_file(drive, path1, path2)
+                os.rename(path1, path2)
 
             except ImportError:
                 print("Google Drive utilities not found. Please ensure gdrive_utils.py is available.")
